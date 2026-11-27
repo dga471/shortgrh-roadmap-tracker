@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tau Ceti ShortGRH Roadmap — Dependency Graph & Progress</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0d14;
+      --surface: #111622;
+      --surface-2: #171e2e;
+      --surface-3: #1e273b;
+      --border: #253047;
+      --border-hi: #3b4c6e;
+      --text: #e6edf7;
+      --muted: #8a9bb5;
+      --accent: #60a5fa;
+      --green: #34d399;
+      --green-dim: rgba(52, 211, 153, 0.14);
+      --amber: #fbbf24;
+      --amber-dim: rgba(251, 191, 36, 0.14);
+      --purple: #a78bfa;
+      --purple-dim: rgba(167, 139, 250, 0.14);
+      --slate: #475569;
+      --slate-dim: rgba(71, 85, 105, 0.22);
+      --cyan: #38bdf8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px 20px 80px;
+    }
+
+    .container { max-width: 1360px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      padding-bottom: 18px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.025em; color: #fff; }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-top: 5px; }
+    .subtitle a { color: var(--accent); text-decoration: none; }
+    .subtitle a:hover { text-decoration: underline; }
+
+    .meta-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .meta-pill strong { color: var(--text); }
+
+    /* KPI row */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+    }
+
+    .kpi-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .kpi-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.55rem;
+      font-weight: 600;
+      color: #fff;
+      margin: 5px 0 4px;
+    }
+    .kpi-value.green { color: var(--green); }
+    .kpi-value.amber { color: var(--amber); }
+
+    .kpi-sub { font-size: 0.78rem; color: var(--muted); }
+
+    /* Master progress bar */
+    .master-bar-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+    }
+
+    .master-bar-header {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 0.82rem;
+      margin-bottom: 8px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.green { background: var(--green); }
+    .swatch.amber { background: var(--amber); }
+    .swatch.empty { background: #2b364d; }
+    .swatch.up { background: var(--cyan); }
+    .swatch.down { background: var(--purple); }
+
+    .seg-bar {
+      height: 12px;
+      border-radius: 999px;
+      background: #1e273a;
+      overflow: hidden;
+      display: flex;
+    }
+    .seg-bar .seg-merged { background: var(--green); transition: width 0.3s; }
+    .seg-bar .seg-open { background: var(--amber); transition: width 0.3s; }
+
+    /* Controls bar */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+    .btn-group {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .btn-group button {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-group button:hover { color: var(--text); }
+    .btn-group button.active {
+      background: var(--surface-3);
+      color: #fff;
+    }
+
+    .search-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.82rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      min-width: 240px;
+      outline: none;
+    }
+    .search-box:focus { border-color: var(--accent); }
+
+    /* Dependency Graph Panel */
+    .graph-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 24px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .graph-hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .graph-stage {
+      position: relative;
+      min-width: 980px;
+    }
+
+    svg#edge-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .tiers-wrap {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    .tier-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tier-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      padding-left: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tier-label::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: rgba(37, 48, 71, 0.7);
+    }
+
+    .tier-nodes {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .node-card {
+      width: 210px;
+      background: var(--surface-2);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: transform 0.14s ease, border-color 0.14s ease, opacity 0.14s ease, box-shadow 0.14s ease;
+      position: relative;
+    }
+
+    .node-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    }
+
+    .node-card.has-open { border-color: rgba(251, 191, 36, 0.45); }
+    .node-card.has-merged { border-color: rgba(52, 211, 153, 0.55); }
+    .node-card.is-endgame {
+      width: 300px;
+      border-color: rgba(96, 165, 250, 0.65);
+      background: linear-gradient(135deg, #162036, #19243d);
+    }
+
+    .node-card.dimmed { opacity: 0.22; }
+    .node-card.hl-up { border-color: var(--cyan) !important; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25); opacity: 1 !important; }
+    .node-card.hl-down { border-color: var(--purple) !important; box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.25); opacity: 1 !important; }
+    .node-card.hl-self { border-color: #fff !important; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3); opacity: 1 !important; }
+
+    .node-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 5px;
+    }
+
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.64rem;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .badge.arg { background: rgba(96, 165, 250, 0.16); color: #93c5fd; }
+    .badge.bg { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; }
+    .badge.pr-pill { background: var(--amber-dim); color: var(--amber); }
+    .badge.done-pill { background: var(--green-dim); color: var(--green); }
+    .badge.empty-pill { background: var(--slate-dim); color: var(--muted); }
+
+    .node-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.28;
+      margin-bottom: 7px;
+      min-height: 2.05em;
+    }
+
+    .mini-bar {
+      height: 5px;
+      background: #0d121d;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+      margin-bottom: 6px;
+    }
+    .mini-bar .seg-merged { background: var(--green); }
+    .mini-bar .seg-open { background: var(--amber); }
+
+    .node-stats {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.69rem;
+      color: var(--muted);
+    }
+
+    /* Table panel */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 22px;
+    }
+
+    .panel-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .panel-title { font-size: 1.02rem; font-weight: 600; color: #fff; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th {
+      text-align: left;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { color: #fff; }
+    td { padding: 9px 10px; border-bottom: 1px solid rgba(37, 48, 71, 0.5); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover td { background: rgba(255,255,255,0.025); }
+
+    .num { font-family: 'JetBrains Mono', monospace; text-align: right; white-space: nowrap; }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; }
+
+    /* Drawer */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 14, 0.65);
+      z-index: 90;
+      display: none;
+    }
+    .drawer-backdrop.open { display: block; }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(640px, 95vw);
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 100;
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-head {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .drawer-close {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .drawer-body {
+      padding: 18px 22px 40px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 6px 0 14px;
+    }
+
+    .chip {
+      font-size: 0.74rem;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .chip:hover { border-color: var(--accent); color: #fff; }
+    .chip.up { border-color: rgba(56, 189, 248, 0.4); color: #7dd3fc; }
+    .chip.down { border-color: rgba(167, 139, 250, 0.4); color: #c4b5fd; }
+
+    .layer-group { margin-top: 16px; }
+    .layer-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(37, 48, 71, 0.7);
+    }
+
+    .sec-item {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--slate);
+      border-radius: 8px;
+      padding: 9px 12px;
+      margin-bottom: 7px;
+      font-size: 0.81rem;
+    }
+    .sec-item.status-merged { border-left-color: var(--green); }
+    .sec-item.status-open { border-left-color: var(--amber); }
+
+    .sec-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .sec-id { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; margin-right: 6px; }
+    .sec-meta { font-size: 0.73rem; color: var(--muted); margin-top: 4px; }
+
+    .pr-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .pr-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 5px;
+      text-decoration: none;
+    }
+    .pr-tag.open { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.3); }
+    .pr-tag.merged { background: var(--green-dim); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .pr-tag:hover { filter: brightness(1.18); }
+
+    footer {
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Tau Ceti ShortGRH Roadmap — Dependency Graph</h1>
+        <p class="subtitle">
+          Live progress tracker for
+          <a href="https://github.com/TauCetiProject/TauCetiRoadmap/tree/main/TauCetiRoadmap/ShortGRH" target="_blank" rel="noopener">TauCetiRoadmap/ShortGRH</a>
+          across all 25 sub-roadmaps &amp; 903 sections against
+          <a href="https://github.com/TauCetiProject/TauCeti" target="_blank" rel="noopener">TauCetiProject/TauCeti</a> PRs.
+        </p>
+      </div>
+      <div class="meta-pill" id="meta-pill">Loading…</div>
+    </header>
+
+    <section class="kpi-grid" id="kpi-grid"></section>
+
+    <section class="master-bar-wrap">
+      <div class="master-bar-header">
+        <strong id="master-summary">Overall Roadmap Progress</strong>
+        <div class="legend">
+          <span class="legend-item"><span class="swatch green"></span>Merged (Done)</span>
+          <span class="legend-item"><span class="swatch amber"></span>In Flight (Open PR)</span>
+          <span class="legend-item"><span class="swatch empty"></span>Not Started (Empty)</span>
+          <span class="legend-item"><span class="swatch up"></span>Hover: Upstream Prereq</span>
+          <span class="legend-item"><span class="swatch down"></span>Hover: Downstream Consumer</span>
+        </div>
+      </div>
+      <div class="seg-bar">
+        <div class="seg-merged" id="master-merged" style="width:0%"></div>
+        <div class="seg-open" id="master-open" style="width:0%"></div>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <div class="controls">
+        <div class="btn-group" id="filter-group">
+          <button data-filter="all" class="active">All (25)</button>
+          <button data-filter="arg">Argument (11)</button>
+          <button data-filter="bg">Background (14)</button>
+          <button data-filter="active">Has PRs</button>
+          <button data-filter="empty">Empty Only</button>
+        </div>
+        <div class="btn-group" id="edge-group">
+          <button data-edges="hover" class="active">Edges on Hover</button>
+          <button data-edges="all">Show All Edges</button>
+        </div>
+      </div>
+      <input type="text" class="search-box" id="search-input" placeholder="Filter roadmaps, sections, or PR #…" />
+    </div>
+
+    <section class="graph-panel">
+      <div class="graph-hint">
+        <span><strong>Click any node</strong> to inspect all layers, sections &amp; PRs · <strong>Hover</strong> to trace upstream/downstream dependencies</span>
+        <span id="edge-count-hint"></span>
+      </div>
+      <div class="graph-stage" id="graph-stage">
+        <svg id="edge-layer"></svg>
+        <div class="tiers-wrap" id="tiers-wrap"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">All 25 Sub-Roadmaps</div>
+        <span style="font-size:0.78rem;color:var(--muted);">Click any column header to sort · Click a row to open section breakdown</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="summary-table">
+          <thead>
+            <tr>
+              <th data-sort="tier">Tier</th>
+              <th data-sort="id">Sub-Roadmap</th>
+              <th data-sort="kind">Kind</th>
+              <th data-sort="pct">Coverage</th>
+              <th data-sort="mergedSections" class="num">Done</th>
+              <th data-sort="openSections" class="num">In Flight</th>
+              <th data-sort="emptySections" class="num">Empty</th>
+              <th data-sort="openPrCount" class="num">Open PRs</th>
+              <th data-sort="loc" class="num">[ShortProof] LOC</th>
+              <th data-sort="estPrs" class="num">Est. Total PRs</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" id="unmapped-panel" style="display:none;">
+      <div class="panel-header">
+        <div class="panel-title" id="unmapped-title">General Prerequisite PRs</div>
+        <span style="font-size:0.78rem;color:var(--muted);">PRs mentioning ShortGRH without a specific sub-roadmap §X.Y anchor</span>
+      </div>
+      <div class="pr-list" id="unmapped-list"></div>
+    </section>
+
+    <footer>
+      <div>
+        Roadmap source: <a href="https://github.com/TauCetiProject/TauCetiRoadmap/tree/main/TauCetiRoadmap/ShortGRH" target="_blank" rel="noopener">TauCetiProject/TauCetiRoadmap</a>
+        · PR status: <a href="https://github.com/TauCetiProject/TauCeti/pulls?q=is%3Apr+ShortGRH" target="_blank" rel="noopener">TauCetiProject/TauCeti</a>
+        · Estimated PRs calibrated at ~421 LOC/PR (mean of 502 recent TauCeti <code>feat:</code> PRs).
+      </div>
+      <div>Auto-refreshed via GitHub Actions</div>
+    </footer>
+  </div>
+
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-head">
+      <div>
+        <div id="drawer-badges" style="display:flex;gap:6px;margin-bottom:6px;"></div>
+        <h2 id="drawer-title" style="font-size:1.12rem;color:#fff;line-height:1.3;"></h2>
+        <div id="drawer-sub" style="font-size:0.78rem;color:var(--muted);margin-top:4px;"></div>
+      </div>
+      <button class="drawer-close" id="drawer-close" title="Close">&times;</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <script>
+    const RM_BASE = 'https://github.com/TauCetiProject/TauCetiRoadmap/blob/main/TauCetiRoadmap/ShortGRH';
+
+    // Logical 5-tier proof architecture (bottom-up toward GRH / RH)
+    const TIERS = [
+      {
+        id: 0,
+        label: 'Tier 0 · Classical, Analytic & Algebraic Foundations',
+        nodes: [
+          'AuxiliaryAlgebraAndAnalysisForThetaLifts',
+          'ZeroFreeRegionsAndPrimesInShortWindows',
+          'ThetaFunctionsAndUnitsOfCMLattices',
+          'IntegralRepresentationsOfGeneralLinearGroups',
+          'IdelicReciprocityCountsAndCyclotomicClassGroups'
+        ]
+      },
+      {
+        id: 1,
+        label: 'Tier 1 · Automorphic, Weil, Moduli & Cohomology Infrastructure (Background)',
+        nodes: [
+          'AdelicUnitaryGroupsAndAlgebraicModularForms',
+          'HolomorphicDiscreteSeriesOfUnitaryGroups',
+          'WeilRepresentationsOnBanachSpacesOfData',
+          'SiegelWeilAndRallisFormulasOnUnitaryGroups',
+          'CohomologyOfFunctorsOnTestRings',
+          'PadicComparisonForFunctorCohomology',
+          'CrystallineRepresentationsAndKisinModules',
+          'AbelianSchemesWithThetaStructuresAndTheirCohomology',
+          'GaloisRepresentationsOfUnitaryEigenforms'
+        ]
+      },
+      {
+        id: 2,
+        label: 'Tier 2 · Upper Bound (Theorem A) & Spanning (Theorem B)',
+        nodes: [
+          'DivisibilityOfThetaDerivatives',
+          'ThetaLiftChainsAndTheSeesawIdentity',
+          'CompositeThetaLiftsAndShortForms',
+          'PairsOfFramesAtOnePlace',
+          'RemainingAndMainTermsOfSecondMoments',
+          'SecondMomentsOfPoincareSeries'
+        ]
+      },
+      {
+        id: 3,
+        label: 'Tier 3 · Lower Bound (Theorem C) & Congruences',
+        nodes: [
+          'NormsOfThetaLiftsAndExchangeIdentities',
+          'SelmerBoundsForAnticyclotomicTwists',
+          'CongruencesOfTwistedThetaLifts',
+          'DeterminantsOfThetaLiftChains'
+        ]
+      },
+      {
+        id: 4,
+        label: 'Tier 4 · Endgame: Shared Setup, Main Inequality → GRH & RH',
+        nodes: [
+          'OneSidedPrimeSumBoundsAndAdmissibleData'
+        ]
+      }
+    ];
+
+    const SHORT_NAMES = {
+      AuxiliaryAlgebraAndAnalysisForThetaLifts: 'Auxiliary Algebra & Analysis',
+      ZeroFreeRegionsAndPrimesInShortWindows: 'Zero-Free Regions & Primes',
+      ThetaFunctionsAndUnitsOfCMLattices: 'CM Theta Functions & Units',
+      IntegralRepresentationsOfGeneralLinearGroups: 'Integral Reps of GL(n)',
+      IdelicReciprocityCountsAndCyclotomicClassGroups: 'Idelic Reciprocity & Class Groups',
+      AdelicUnitaryGroupsAndAlgebraicModularForms: 'Adelic Unitary Groups & Forms',
+      HolomorphicDiscreteSeriesOfUnitaryGroups: 'Holomorphic Discrete Series',
+      WeilRepresentationsOnBanachSpacesOfData: 'Weil Reps on Banach Data',
+      SiegelWeilAndRallisFormulasOnUnitaryGroups: 'Siegel–Weil & Rallis Formulas',
+      CohomologyOfFunctorsOnTestRings: 'Cohomology of Functors',
+      PadicComparisonForFunctorCohomology: 'p-adic Comparison',
+      CrystallineRepresentationsAndKisinModules: 'Crystalline Reps & Kisin Modules',
+      AbelianSchemesWithThetaStructuresAndTheirCohomology: 'Abelian Schemes & Theta Structs',
+      GaloisRepresentationsOfUnitaryEigenforms: 'Galois Reps of Eigenforms',
+      DivisibilityOfThetaDerivatives: 'Divisibility of Theta Derivatives',
+      ThetaLiftChainsAndTheSeesawIdentity: 'Theta Lift Chains & Seesaw',
+      CompositeThetaLiftsAndShortForms: 'Composite Lifts & Short Forms (Thm A)',
+      PairsOfFramesAtOnePlace: 'Pairs of Frames at One Place',
+      RemainingAndMainTermsOfSecondMoments: 'Remaining & Main Terms',
+      SecondMomentsOfPoincareSeries: 'Second Moments (Thm B)',
+      NormsOfThetaLiftsAndExchangeIdentities: 'Norms & Exchange Identities',
+      SelmerBoundsForAnticyclotomicTwists: 'Selmer Bounds for Twists',
+      CongruencesOfTwistedThetaLifts: 'Congruences of Twisted Lifts',
+      DeterminantsOfThetaLiftChains: 'Determinants of Lift Chains (Thm C)',
+      OneSidedPrimeSumBoundsAndAdmissibleData: 'Main Inequality → GRH & RH (Endgame)'
+    };
+
+    const fmt = n => Math.round(n).toLocaleString('en-US');
+    const pct = (a, b) => b ? ((a / b) * 100).toFixed(1) + '%' : '0.0%';
+
+    let DATA = null;
+    let NODE_MAP = {};
+    let UPSTREAM = {};   // id -> Set of prerequisite ids
+    let DOWNSTREAM = {}; // id -> Set of consumer ids
+    let TIER_OF = {};
+    let state = { filter: 'all', edges: 'hover', search: '', sortKey: 'tier', sortDir: 1, hovered: null };
+
+    function renderKPIs() {
+      const emptySecs = DATA.totalSections - DATA.mergedSections - DATA.openSections;
+      const estTotalPrs = Math.round(DATA.totalLoc / (DATA.estPrsPerLoc || 421));
+      const estRemaining = Math.max(0, estTotalPrs - DATA.mergedPrs);
+      const activeRoadmaps = DATA.nodes.filter(n => n.mergedPrCount + n.openPrCount > 0).length;
+
+      const cards = [
+        {
+          label: 'Completed (Merged)',
+          val: `${DATA.mergedSections} / ${DATA.totalSections}`,
+          cls: 'green',
+          sub: `${pct(DATA.mergedSections, DATA.totalSections)} of sections · ${DATA.mergedPrs} merged PRs`
+        },
+        {
+          label: 'In Flight (Open PRs)',
+          val: `${DATA.openSections} / ${DATA.totalSections}`,
+          cls: 'amber',
+          sub: `${pct(DATA.openSections, DATA.totalSections)} of sections · ${DATA.openPrs} open PRs across ${activeRoadmaps}/25 roadmaps`
+        },
+        {
+          label: 'Still Empty (Not Started)',
+          val: `${emptySecs} / ${DATA.totalSections}`,
+          cls: '',
+          sub: `${pct(emptySecs, DATA.totalSections)} of sections untouched`
+        },
+        {
+          label: 'Estimated PRs Remaining',
+          val: `~${fmt(estRemaining)}`,
+          cls: '',
+          sub: `~${fmt(estTotalPrs)} total feat PRs (${fmt(DATA.totalLoc)} LOC ÷ ${DATA.estPrsPerLoc}/PR)`
+        }
+      ];
+
+      document.getElementById('kpi-grid').innerHTML = cards.map(c => `
+        <div class="kpi-card">
+          <div class="kpi-label">${c.label}</div>
+          <div class="kpi-value ${c.cls}">${c.val}</div>
+          <div class="kpi-sub">${c.sub}</div>
+        </div>
+      `).join('');
+
+      document.getElementById('meta-pill').innerHTML =
+        `Updated <strong>${DATA.generatedAt.slice(0, 16).replace('T', ' ')} UTC</strong> · <strong>${DATA.openPrs}</strong> open / <strong>${DATA.mergedPrs}</strong> merged PRs`;
+
+      const mPct = (DATA.mergedSections / DATA.totalSections) * 100;
+      const oPct = (DATA.openSections / DATA.totalSections) * 100;
+      document.getElementById('master-merged').style.width = mPct + '%';
+      document.getElementById('master-open').style.width = oPct + '%';
+      document.getElementById('master-summary').textContent =
+        `Overall Section Coverage: ${pct(DATA.mergedSections, DATA.totalSections)} merged · ${pct(DATA.openSections, DATA.totalSections)} in flight · ${pct(emptySecs, DATA.totalSections)} empty`;
+      document.getElementById('edge-count-hint').textContent =
+        `${DATA.nodes.length} sub-roadmaps · ${DATA.edges.length} cross-roadmap dependencies`;
+    }
+
+    function nodeMatchesFilter(n) {
+      if (state.filter === 'arg' && n.kind !== 'arg') return false;
+      if (state.filter === 'bg' && n.kind !== 'bg') return false;
+      if (state.filter === 'active' && (n.mergedPrCount + n.openPrCount) === 0) return false;
+      if (state.filter === 'empty' && (n.mergedSections + n.openSections) > 0) return false;
+      if (state.search) {
+        const q = state.search.toLowerCase();
+        const hay = `${n.id} ${n.title} ${SHORT_NAMES[n.id] || ''}`.toLowerCase();
+        if (hay.includes(q)) return true;
+        // Also search sections and PR numbers/titles
+        for (const s of n.sections) {
+          if (`${s.id} ${s.title}`.toLowerCase().includes(q)) return true;
+          for (const p of [...s.mergedPrs, ...s.openPrs]) {
+            if (`#${p.number} ${p.title}`.toLowerCase().includes(q)) return true;
+          }
+        }
+        return false;
+      }
+      return true;
+    }
+
+    function renderGraph() {
+      const wrap = document.getElementById('tiers-wrap');
+      wrap.innerHTML = TIERS.map(tier => {
+        const cards = tier.nodes.map(id => {
+          const n = NODE_MAP[id];
+          if (!n) return '';
+          const vis = nodeMatchesFilter(n);
+          const mW = n.totalSections ? (n.mergedSections / n.totalSections) * 100 : 0;
+          const oW = n.totalSections ? (n.openSections / n.totalSections) * 100 : 0;
+          const statusCls = n.mergedSections > 0 ? 'has-merged' : (n.openPrCount > 0 ? 'has-open' : '');
+          const endCls = id === 'OneSidedPrimeSumBoundsAndAdmissibleData' ? 'is-endgame' : '';
+          const prBadge = n.mergedPrCount > 0
+            ? `<span class="badge done-pill">${n.mergedPrCount} merged</span>`
+            : (n.openPrCount > 0
+              ? `<span class="badge pr-pill">${n.openPrCount} PR${n.openPrCount === 1 ? '' : 's'}</span>`
+              : `<span class="badge empty-pill">empty</span>`);
+          return `
+            <div class="node-card ${statusCls} ${endCls} ${vis ? '' : 'dimmed'}" data-id="${id}">
+              <div class="node-top">
+                <span class="badge ${n.kind}">${n.kind === 'arg' ? 'ARG' : 'BG'}</span>
+                ${prBadge}
+              </div>
+              <div class="node-name">${SHORT_NAMES[id] || id}</div>
+              <div class="mini-bar">
+                <div class="seg-merged" style="width:${mW}%"></div>
+                <div class="seg-open" style="width:${oW}%"></div>
+              </div>
+              <div class="node-stats">
+                <span>${n.mergedSections}+${n.openSections}/${n.totalSections} §</span>
+                <span>${(n.loc / 1000).toFixed(1)}k LOC</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="tier-row">
+            <div class="tier-label">${tier.label}</div>
+            <div class="tier-nodes">${cards}</div>
+          </div>
+        `;
+      }).join('');
+
+      wrap.querySelectorAll('.node-card').forEach(el => {
+        const id = el.dataset.id;
+        el.addEventListener('mouseenter', () => { state.hovered = id; applyHoverHighlight(); drawEdges(); });
+        el.addEventListener('mouseleave', () => { state.hovered = null; applyHoverHighlight(); drawEdges(); });
+        el.addEventListener('click', () => openDrawer(id));
+      });
+
+      requestAnimationFrame(drawEdges);
+    }
+
+    function applyHoverHighlight() {
+      const h = state.hovered;
+      document.querySelectorAll('.node-card').forEach(el => {
+        el.classList.remove('hl-up', 'hl-down', 'hl-self');
+        const id = el.dataset.id;
+        const vis = nodeMatchesFilter(NODE_MAP[id]);
+        if (!h) {
+          el.classList.toggle('dimmed', !vis);
+          return;
+        }
+        if (id === h) {
+          el.classList.remove('dimmed');
+          el.classList.add('hl-self');
+        } else if (UPSTREAM[h] && UPSTREAM[h].has(id)) {
+          el.classList.remove('dimmed');
+          el.classList.add('hl-up');
+        } else if (DOWNSTREAM[h] && DOWNSTREAM[h].has(id)) {
+          el.classList.remove('dimmed');
+          el.classList.add('hl-down');
+        } else {
+          el.classList.add('dimmed');
+        }
+      });
+    }
+
+    function drawEdges() {
+      const stage = document.getElementById('graph-stage');
+      const svg = document.getElementById('edge-layer');
+      const rect = stage.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+
+      const pos = {};
+      stage.querySelectorAll('.node-card').forEach(el => {
+        const r = el.getBoundingClientRect();
+        pos[el.dataset.id] = {
+          cx: r.left - rect.left + r.width / 2,
+          top: r.top - rect.top,
+          bottom: r.bottom - rect.top,
+          cy: r.top - rect.top + r.height / 2
+        };
+      });
+
+      const h = state.hovered;
+      const showAll = state.edges === 'all';
+      let paths = `
+        <defs>
+          <marker id="arr-up" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+          </marker>
+          <marker id="arr-down" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#a78bfa" />
+          </marker>
+          <marker id="arr-dim" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="rgba(148,163,184,0.28)" />
+          </marker>
+        </defs>
+      `;
+
+      for (const e of DATA.edges) {
+        const a = pos[e.from], b = pos[e.to];
+        if (!a || !b) continue;
+        const isUp = h && e.to === h;
+        const isDown = h && e.from === h;
+        if (!showAll && !isUp && !isDown) continue;
+
+        let stroke = 'rgba(148, 163, 184, 0.16)';
+        let sw = 1;
+        let marker = 'url(#arr-dim)';
+        if (isUp) { stroke = '#38bdf8'; sw = 2; marker = 'url(#arr-up)'; }
+        else if (isDown) { stroke = '#a78bfa'; sw = 2; marker = 'url(#arr-down)'; }
+        else if (h) { stroke = 'rgba(148, 163, 184, 0.04)'; sw = 0.8; marker = ''; }
+
+        const y1 = a.cy < b.cy ? a.bottom : a.top;
+        const y2 = a.cy < b.cy ? b.top : b.bottom;
+        const dy = Math.max(24, Math.abs(y2 - y1) * 0.42);
+        const c1y = a.cy < b.cy ? y1 + dy : y1 - dy;
+        const c2y = a.cy < b.cy ? y2 - dy : y2 + dy;
+        const d = `M ${a.cx} ${y1} C ${a.cx} ${c1y}, ${b.cx} ${c2y}, ${b.cx} ${y2}`;
+        paths += `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}" ${marker ? `marker-end="${marker}"` : ''} />`;
+      }
+      svg.innerHTML = paths;
+    }
+
+    function renderTable() {
+      const rows = DATA.nodes.map(n => ({
+        ...n,
+        tier: TIER_OF[n.id] ?? 0,
+        emptySections: n.totalSections - n.mergedSections - n.openSections,
+        pct: n.totalSections ? (n.mergedSections + n.openSections) / n.totalSections : 0,
+        estPrs: Math.max(1, Math.round(n.loc / (DATA.estPrsPerLoc || 421)))
+      })).filter(nodeMatchesFilter);
+
+      rows.sort((a, b) => {
+        const k = state.sortKey;
+        const va = a[k], vb = b[k];
+        if (typeof va === 'string') return va.localeCompare(vb) * state.sortDir;
+        return (va - vb) * state.sortDir;
+      });
+
+      const tbody = document.querySelector('#summary-table tbody');
+      tbody.innerHTML = rows.map(n => {
+        const mW = n.totalSections ? (n.mergedSections / n.totalSections) * 100 : 0;
+        const oW = n.totalSections ? (n.openSections / n.totalSections) * 100 : 0;
+        return `
+          <tr data-id="${n.id}">
+            <td class="mono" style="color:var(--muted);">T${n.tier}</td>
+            <td>
+              <div style="font-weight:600;color:#fff;">${SHORT_NAMES[n.id] || n.id}</div>
+              <div class="mono" style="color:var(--muted);font-size:0.71rem;">${n.id}</div>
+            </td>
+            <td><span class="badge ${n.kind}">${n.kind === 'arg' ? 'ARG' : 'BG'}</span></td>
+            <td style="min-width:130px;">
+              <div class="mini-bar" style="height:7px;margin-bottom:3px;">
+                <div class="seg-merged" style="width:${mW}%"></div>
+                <div class="seg-open" style="width:${oW}%"></div>
+              </div>
+              <div class="mono" style="font-size:0.7rem;color:var(--muted);">${pct(n.mergedSections + n.openSections, n.totalSections)} active</div>
+            </td>
+            <td class="num" style="color:${n.mergedSections ? 'var(--green)' : 'var(--muted)'};">${n.mergedSections}</td>
+            <td class="num" style="color:${n.openSections ? 'var(--amber)' : 'var(--muted)'};">${n.openSections}</td>
+            <td class="num">${n.emptySections}</td>
+            <td class="num" style="color:${n.openPrCount ? 'var(--amber)' : 'var(--muted)'};">${n.openPrCount}</td>
+            <td class="num">${fmt(n.loc)}</td>
+            <td class="num">~${n.estPrs}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.querySelectorAll('tr').forEach(tr => {
+        tr.addEventListener('click', () => openDrawer(tr.dataset.id));
+      });
+    }
+
+    function renderUnmapped() {
+      if (!DATA.unmappedPrs || DATA.unmappedPrs.length === 0) return;
+      document.getElementById('unmapped-panel').style.display = 'block';
+      document.getElementById('unmapped-title').textContent = `General Prerequisite PRs (${DATA.unmappedPrs.length})`;
+      document.getElementById('unmapped-list').innerHTML = DATA.unmappedPrs.map(p =>
+        `<a class="pr-tag ${p.state}" href="${p.url}" target="_blank" rel="noopener">#${p.number} · ${p.title}</a>`
+      ).join('');
+    }
+
+    function openDrawer(id) {
+      const n = NODE_MAP[id];
+      if (!n) return;
+      const emptySecs = n.totalSections - n.mergedSections - n.openSections;
+      const estPrs = Math.max(1, Math.round(n.loc / (DATA.estPrsPerLoc || 421)));
+
+      document.getElementById('drawer-badges').innerHTML = `
+        <span class="badge ${n.kind}">${n.kind === 'arg' ? 'Argument Roadmap' : 'Background Roadmap'}</span>
+        <span class="badge ${n.mergedSections ? 'done-pill' : (n.openPrCount ? 'pr-pill' : 'empty-pill')}">
+          ${n.mergedSections} done · ${n.openSections} in flight · ${emptySecs} empty
+        </span>
+      `;
+      document.getElementById('drawer-title').textContent = n.title || id;
+      document.getElementById('drawer-sub').innerHTML =
+        `<code>${id}</code> · ${fmt(n.loc)} LOC (~${estPrs} est. PRs) · ` +
+        `<a href="${RM_BASE}/${id}/README.md" target="_blank" rel="noopener" style="color:var(--accent);">Open README on GitHub ↗</a>`;
+
+      const ups = [...(UPSTREAM[id] || [])].sort();
+      const downs = [...(DOWNSTREAM[id] || [])].sort();
+
+      let html = '';
+      if (ups.length) {
+        html += `<div class="kpi-label">Upstream Prerequisites (${ups.length})</div><div class="chip-row">` +
+          ups.map(u => `<span class="chip up" data-jump="${u}">← ${SHORT_NAMES[u] || u}</span>`).join('') + `</div>`;
+      }
+      if (downs.length) {
+        html += `<div class="kpi-label">Downstream Consumers (${downs.length})</div><div class="chip-row">` +
+          downs.map(d => `<span class="chip down" data-jump="${d}">→ ${SHORT_NAMES[d] || d}</span>`).join('') + `</div>`;
+      }
+
+      if ((n.unmatchedOpenPrs && n.unmatchedOpenPrs.length) || (n.unmatchedMergedPrs && n.unmatchedMergedPrs.length)) {
+        const allU = [...(n.unmatchedMergedPrs || []), ...(n.unmatchedOpenPrs || [])];
+        html += `<div class="kpi-label">Roadmap-Level PRs (${allU.length})</div><div class="pr-list" style="margin-bottom:14px;">` +
+          allU.map(p => `<a class="pr-tag ${p.state}" href="${p.url}" target="_blank" rel="noopener">#${p.number} · ${p.title}</a>`).join('') + `</div>`;
+      }
+
+      // Group sections by layer
+      const layers = new Map();
+      for (const s of n.sections) {
+        if (!layers.has(s.layer)) layers.set(s.layer, []);
+        layers.get(s.layer).push(s);
+      }
+
+      for (const [layerName, secs] of layers.entries()) {
+        html += `<div class="layer-group"><div class="layer-title">${layerName} (${secs.length})</div>`;
+        for (const s of secs) {
+          const st = s.mergedPrs.length ? 'status-merged' : (s.openPrs.length ? 'status-open' : 'status-empty');
+          const stBadge = s.mergedPrs.length
+            ? `<span class="badge done-pill">done</span>`
+            : (s.openPrs.length ? `<span class="badge pr-pill">${s.openPrs.length} open</span>` : `<span class="badge empty-pill">empty</span>`);
+          const prsHtml = [...s.mergedPrs, ...s.openPrs].map(p =>
+            `<a class="pr-tag ${p.state}" href="${p.url}" target="_blank" rel="noopener" title="${p.title.replace(/"/g, '&quot;')}">#${p.number} · ${p.title.length > 52 ? p.title.slice(0, 50) + '…' : p.title}</a>`
+          ).join('');
+          const depsParts = [];
+          if (s.localDeps && s.localDeps.length) depsParts.push(`Local: §${s.localDeps.join(', §')}`);
+          if (s.extDeps && s.extDeps.length) depsParts.push(`Cross: ${s.extDeps.map(x => SHORT_NAMES[x] || x).join(', ')}`);
+          html += `
+            <div class="sec-item ${st}">
+              <div class="sec-head">
+                <div><span class="sec-id">§${s.id}</span>${s.title}</div>
+                ${stBadge}
+              </div>
+              ${depsParts.length ? `<div class="sec-meta">Needs: ${depsParts.join(' · ')}</div>` : ''}
+              ${prsHtml ? `<div class="pr-list">${prsHtml}</div>` : ''}
+            </div>
+          `;
+        }
+        html += `</div>`;
+      }
+
+      const body = document.getElementById('drawer-body');
+      body.innerHTML = html;
+      body.scrollTop = 0;
+      body.querySelectorAll('[data-jump]').forEach(el => {
+        el.addEventListener('click', () => openDrawer(el.dataset.jump));
+      });
+
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawer-backdrop').classList.add('open');
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawer-backdrop').classList.remove('open');
+    }
+
+    function wireControls() {
+      document.querySelectorAll('#filter-group button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#filter-group button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          state.filter = btn.dataset.filter;
+          applyHoverHighlight();
+          renderTable();
+        });
+      });
+
+      document.querySelectorAll('#edge-group button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#edge-group button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          state.edges = btn.dataset.edges;
+          drawEdges();
+        });
+      });
+
+      document.getElementById('search-input').addEventListener('input', e => {
+        state.search = e.target.value.trim();
+        applyHoverHighlight();
+        renderTable();
+      });
+
+      document.querySelectorAll('#summary-table th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+          const k = th.dataset.sort;
+          if (state.sortKey === k) state.sortDir *= -1;
+          else { state.sortKey = k; state.sortDir = (k === 'id' || k === 'tier' || k === 'kind') ? 1 : -1; }
+          renderTable();
+        });
+      });
+
+      document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+      document.getElementById('drawer-backdrop').addEventListener('click', closeDrawer);
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+      window.addEventListener('resize', () => requestAnimationFrame(drawEdges));
+    }
+
+    async function init() {
+      const res = await fetch('./data.json');
+      DATA = await res.json();
+      for (const n of DATA.nodes) {
+        NODE_MAP[n.id] = n;
+        UPSTREAM[n.id] = new Set();
+        DOWNSTREAM[n.id] = new Set();
+      }
+      for (const e of DATA.edges) {
+        if (UPSTREAM[e.to]) UPSTREAM[e.to].add(e.from);
+        if (DOWNSTREAM[e.from]) DOWNSTREAM[e.from].add(e.to);
+      }
+      for (const t of TIERS) {
+        for (const id of t.nodes) TIER_OF[id] = t.id;
+      }
+      renderKPIs();
+      renderGraph();
+      renderTable();
+      renderUnmapped();
+      wireControls();
+    }
+
+    init();
+  </script>
+</body>
+</html>
