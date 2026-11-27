@@ -66,14 +66,17 @@ def fetch_shortgrh_prs() -> list[dict]:
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
+    seen: set[int] = set()
     prs = []
-    for state in ("is:merged", "is:open"):
+    queries = [
+        'repo:TauCetiProject/TauCeti+is:pr+is:closed+label:"roadmap/ShortGRH"',
+        'repo:TauCetiProject/TauCeti+is:pr+is:open+label:"roadmap/ShortGRH"',
+        'repo:TauCetiProject/TauCeti+is:pr+is:closed+ShortGRH',
+        'repo:TauCetiProject/TauCeti+is:pr+is:open+ShortGRH',
+    ]
+    for q in queries:
         for page in range(1, 11):
-            url = (
-                "https://api.github.com/search/issues"
-                f"?q=repo:TauCetiProject/TauCeti+is:pr+{state}+ShortGRH"
-                f"&per_page=100&page={page}"
-            )
+            url = f"https://api.github.com/search/issues?q={q}&per_page=100&page={page}"
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=30) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
@@ -81,11 +84,28 @@ def fetch_shortgrh_prs() -> list[dict]:
             if not items:
                 break
             for it in items:
+                num = it["number"]
+                if num in seen:
+                    continue
+                seen.add(num)
+                raw_title = it["title"] or ""
+                is_bors_merged = (it["state"] == "closed") and (
+                    raw_title.startswith("[Merged by Bors]")
+                    or bool((it.get("pull_request") or {}).get("merged_at"))
+                )
+                if is_bors_merged:
+                    st = "merged"
+                elif it["state"] == "open":
+                    st = "open"
+                else:
+                    continue  # skip closed-without-merge PRs
+                clean_title = re.sub(r"^\[Merged by Bors\]\s*-\s*", "", raw_title)
                 prs.append(
                     {
-                        "number": it["number"],
-                        "state": "merged" if state == "is:merged" else "open",
-                        "title": it["title"],
+                        "number": num,
+                        "state": st,
+                        "author": (it.get("user") or {}).get("login", ""),
+                        "title": clean_title,
                         "url": it["html_url"],
                         "updated": it["updated_at"],
                         "body": it.get("body") or "",
@@ -213,6 +233,7 @@ def main() -> int:
                 "title": pr["title"],
                 "url": pr["url"],
                 "state": pr["state"],
+                "author": pr.get("author", ""),
                 "updated": pr["updated"],
             }
             first_para = re.split(r"\r?\n\r?\n", body, maxsplit=1)[0]
