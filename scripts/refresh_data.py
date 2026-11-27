@@ -7,7 +7,7 @@ import re
 import subprocess
 import tempfile
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data.json"
@@ -107,6 +107,8 @@ def fetch_shortgrh_prs() -> list[dict]:
                         "author": (it.get("user") or {}).get("login", ""),
                         "title": clean_title,
                         "url": it["html_url"],
+                        "created": it.get("created_at") or "",
+                        "closed": it.get("closed_at") or "",
                         "updated": it["updated_at"],
                         "body": it.get("body") or "",
                     }
@@ -299,6 +301,56 @@ def main() -> int:
                 }
             )
 
+        # Build 1-hour granularity history from PR created/closed timestamps
+        def parse_hour(iso_str: str):
+            if not iso_str:
+                return None
+            dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00")).astimezone(timezone.utc)
+            return dt.replace(minute=0, second=0, microsecond=0)
+
+        merged_by_hr: dict[datetime, int] = {}
+        dga_merged_by_hr: dict[datetime, int] = {}
+        opened_by_hr: dict[datetime, int] = {}
+        all_hours: list[datetime] = []
+
+        for p in prs:
+            ch = parse_hour(p.get("created", ""))
+            if ch is not None:
+                opened_by_hr[ch] = opened_by_hr.get(ch, 0) + 1
+                all_hours.append(ch)
+            if p["state"] == "merged":
+                mh = parse_hour(p.get("closed", "") or p.get("updated", ""))
+                if mh is not None:
+                    merged_by_hr[mh] = merged_by_hr.get(mh, 0) + 1
+                    if p.get("author") == "dga471":
+                        dga_merged_by_hr[mh] = dga_merged_by_hr.get(mh, 0) + 1
+                    all_hours.append(mh)
+
+        hourly_history = []
+        if all_hours:
+            start_hr = min(all_hours)
+            now_hr = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+            end_hr = max(max(all_hours), now_hr)
+            cur = start_hr
+            cum_m = cum_dga = cum_o = 0
+            while cur <= end_hr:
+                dm = merged_by_hr.get(cur, 0)
+                ddga = dga_merged_by_hr.get(cur, 0)
+                do = opened_by_hr.get(cur, 0)
+                cum_m += dm
+                cum_dga += ddga
+                cum_o += do
+                hourly_history.append(
+                    {
+                        "t": cur.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "merged": cum_m,
+                        "mergedDelta": dm,
+                        "dgaMerged": cum_dga,
+                        "opened": cum_o,
+                    }
+                )
+                cur += timedelta(hours=1)
+
         payload = {
             "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "totalPrsFetched": len(prs),
@@ -310,6 +362,7 @@ def main() -> int:
             "openSections": tot_open,
             "totalLoc": 461424,
             "estPrsPerLoc": 421,
+            "hourlyHistory": hourly_history,
             "nodes": node_list,
             "edges": [{"from": u, "to": v} for u, v in sorted(cross_edges)],
             "unmappedPrs": unmapped_prs,

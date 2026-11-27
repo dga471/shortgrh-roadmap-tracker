@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <style>
     :root {
       --bg: #0a0d14;
@@ -147,6 +149,27 @@
     }
     .seg-bar .seg-merged { background: var(--green); transition: width 0.3s; }
     .seg-bar .seg-open { background: var(--amber); transition: width 0.3s; }
+
+    /* Hourly chart */
+    .chart-wrap {
+      position: relative;
+      height: 270px;
+      width: 100%;
+    }
+    .toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      padding: 4px 9px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .toggle-label input { accent-color: var(--accent); cursor: pointer; }
 
     /* Controls bar */
     .toolbar {
@@ -568,6 +591,28 @@
       </div>
     </section>
 
+    <section class="panel" id="history-panel" style="margin-bottom:20px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Completed ShortGRH PRs vs. Time (1-Hour Granularity)</div>
+          <div id="velocity-hint" style="font-size:0.78rem;color:var(--muted);margin-top:2px;">Loading hourly PR history…</div>
+        </div>
+        <div class="controls">
+          <div class="btn-group" id="chart-mode-group">
+            <button data-mode="cum_hourly" class="active">Cumulative + Hourly</button>
+            <button data-mode="pipeline">Merged vs. Opened</button>
+          </div>
+          <label class="toggle-label">
+            <input type="checkbox" id="show-dga" />
+            Show dga471
+          </label>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="prHistoryChart"></canvas>
+      </div>
+    </section>
+
     <div class="toolbar">
       <div class="controls">
         <div class="btn-group" id="filter-group">
@@ -751,7 +796,156 @@
     let UPSTREAM = {};   // id -> Set of prerequisite ids
     let DOWNSTREAM = {}; // id -> Set of consumer ids
     let TIER_OF = {};
-    let state = { filter: 'all', edges: 'hover', search: '', sortKey: 'tier', sortDir: 1, hovered: null };
+    let prChart = null;
+    let state = { filter: 'all', edges: 'hover', search: '', sortKey: 'tier', sortDir: 1, hovered: null, chartMode: 'cum_hourly', showDga: false };
+
+    function renderHistoryChart() {
+      const hist = DATA.hourlyHistory || [];
+      if (!hist.length) {
+        document.getElementById('history-panel').style.display = 'none';
+        return;
+      }
+
+      // Compute last-24h velocity & ETA to ~estTotalPrs
+      const last = hist[hist.length - 1];
+      const windowHrs = Math.min(24, hist.length);
+      const recentSlice = hist.slice(-windowHrs);
+      const mergedInWindow = recentSlice.reduce((s, x) => s + (x.mergedDelta || 0), 0);
+      const rate = windowHrs > 0 ? mergedInWindow / windowHrs : 0;
+      const estTotal = Math.round(DATA.totalLoc / (DATA.estPrsPerLoc || 421));
+      const remaining = Math.max(0, estTotal - DATA.mergedPrs);
+      const etaDays = rate > 0.05 ? (remaining / rate / 24).toFixed(1) : '—';
+      document.getElementById('velocity-hint').innerHTML =
+        `Last ${windowHrs}h: <strong style="color:var(--green);">+${mergedInWindow} merged</strong> (${rate.toFixed(1)} PRs/hr) · ` +
+        `Est. ~${etaDays} days to ~${fmt(estTotal)} PRs at current pace · ` +
+        `dga471: <strong style="color:var(--accent);">${last.dgaMerged}</strong> merged`;
+
+      const ctx = document.getElementById('prHistoryChart').getContext('2d');
+      if (prChart) prChart.destroy();
+
+      const grad = ctx.createLinearGradient(0, 0, 0, 260);
+      grad.addColorStop(0, 'rgba(52, 211, 153, 0.28)');
+      grad.addColorStop(1, 'rgba(52, 211, 153, 0.01)');
+
+      const datasets = [];
+      if (state.chartMode === 'cum_hourly') {
+        datasets.push({
+          type: 'line',
+          label: 'Cumulative Merged PRs',
+          data: hist.map(h => ({ x: new Date(h.t).getTime(), y: h.merged })),
+          borderColor: '#34d399',
+          backgroundColor: grad,
+          borderWidth: 2.2,
+          fill: true,
+          tension: 0.15,
+          pointRadius: 1.5,
+          pointHoverRadius: 5,
+          yAxisID: 'y'
+        });
+        datasets.push({
+          type: 'bar',
+          label: 'Merged / Hour',
+          data: hist.map(h => ({ x: new Date(h.t).getTime(), y: h.mergedDelta })),
+          backgroundColor: 'rgba(52, 211, 153, 0.32)',
+          borderColor: 'rgba(52, 211, 153, 0.65)',
+          borderWidth: 1,
+          borderRadius: 3,
+          yAxisID: 'y1'
+        });
+      } else {
+        datasets.push({
+          type: 'line',
+          label: 'Cumulative Opened PRs',
+          data: hist.map(h => ({ x: new Date(h.t).getTime(), y: h.opened })),
+          borderColor: '#fbbf24',
+          backgroundColor: 'rgba(251, 191, 36, 0.08)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.15,
+          pointRadius: 1.5,
+          pointHoverRadius: 5,
+          yAxisID: 'y'
+        });
+        datasets.push({
+          type: 'line',
+          label: 'Cumulative Merged PRs',
+          data: hist.map(h => ({ x: new Date(h.t).getTime(), y: h.merged })),
+          borderColor: '#34d399',
+          backgroundColor: grad,
+          borderWidth: 2.2,
+          fill: true,
+          tension: 0.15,
+          pointRadius: 1.5,
+          pointHoverRadius: 5,
+          yAxisID: 'y'
+        });
+      }
+
+      if (state.showDga) {
+        datasets.push({
+          type: 'line',
+          label: 'dga471 Cumulative Merged',
+          data: hist.map(h => ({ x: new Date(h.t).getTime(), y: h.dgaMerged })),
+          borderColor: '#60a5fa',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 3],
+          tension: 0.15,
+          pointRadius: 1.5,
+          pointHoverRadius: 5,
+          yAxisID: 'y'
+        });
+      }
+
+      const scales = {
+        x: {
+          type: 'time',
+          time: { unit: 'hour', displayFormats: { hour: 'MMM d HH:mm' }, tooltipFormat: 'MMM d, HH:00 \'UTC\'' },
+          grid: { color: 'rgba(148, 163, 184, 0.08)' },
+          ticks: { color: '#8a9bb5', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+        },
+        y: {
+          position: 'left',
+          beginAtZero: true,
+          title: { display: true, text: 'Cumulative PRs', color: '#8a9bb5', font: { size: 11 } },
+          grid: { color: 'rgba(148, 163, 184, 0.08)' },
+          ticks: { color: '#8a9bb5' }
+        }
+      };
+      if (state.chartMode === 'cum_hourly') {
+        scales.y1 = {
+          position: 'right',
+          beginAtZero: true,
+          title: { display: true, text: 'PRs / Hour', color: '#8a9bb5', font: { size: 11 } },
+          grid: { drawOnChartArea: false },
+          ticks: { color: '#34d399', precision: 0 }
+        };
+      }
+
+      prChart = new Chart(ctx, {
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#cbd5e1', boxWidth: 11, padding: 14, font: { size: 11 } }
+            },
+            tooltip: {
+              backgroundColor: '#171e2e',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#cbd5e1',
+              padding: 10
+            }
+          },
+          scales
+        }
+      });
+    }
 
     function renderKPIs() {
       const emptySecs = DATA.totalSections - DATA.mergedSections - DATA.openSections;
@@ -1148,6 +1342,19 @@
       document.getElementById('drawer-backdrop').addEventListener('click', closeDrawer);
       document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
       window.addEventListener('resize', () => requestAnimationFrame(drawEdges));
+
+      document.querySelectorAll('#chart-mode-group button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#chart-mode-group button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          state.chartMode = btn.dataset.mode;
+          renderHistoryChart();
+        });
+      });
+      document.getElementById('show-dga').addEventListener('change', e => {
+        state.showDga = e.target.checked;
+        renderHistoryChart();
+      });
     }
 
     async function init() {
@@ -1166,6 +1373,7 @@
         for (const id of t.nodes) TIER_OF[id] = t.id;
       }
       renderKPIs();
+      renderHistoryChart();
       renderGraph();
       renderTable();
       renderUnmapped();
